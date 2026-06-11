@@ -3,7 +3,9 @@ import { useAppContext } from '../context/AppContext.jsx'
 import { db } from '../db/db.js'
 import SummaryCards from '../components/dashboard/SummaryCards.jsx'
 import PillarBars from '../components/dashboard/PillarBars.jsx'
+import BudgetVsActual from '../components/dashboard/BudgetVsActual.jsx'
 import SpendingDonut from '../components/dashboard/SpendingDonut.jsx'
+import SubCategoryBreakdown from '../components/dashboard/SubCategoryBreakdown.jsx'
 import FixedVsVariable from '../components/dashboard/FixedVsVariable.jsx'
 import TransactionItem from '../components/transactions/TransactionItem.jsx'
 import { formatCurrency } from '../utils/formatters.js'
@@ -53,7 +55,9 @@ export default function Dashboard() {
 
       <SummaryCards income={effectiveIncome} totalExpense={totalExpense} balance={balance} />
       <PillarBars transactions={transactions} monthConfig={monthConfig} />
+      <BudgetVsActual transactions={transactions} monthConfig={monthConfig} />
       <SpendingDonut transactions={transactions} />
+      <SubCategoryBreakdown transactions={transactions} />
       <FixedVsVariable transactions={transactions} />
 
       {/* Recent transactions */}
