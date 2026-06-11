@@ -93,6 +93,9 @@ export async function applyDueRecurring() {
   const cy = now.getFullYear()
   const cm = now.getMonth() + 1
   const currentMonthStr = `${cy}-${String(cm).padStart(2, '0')}`
+  // Timestamp for "right now" — used for current-month transactions so the
+  // displayed date reflects when the app was actually opened, not the scheduled day.
+  const nowTimestamp = new Date(cy, cm - 1, today).getTime()
 
   const actives = (await db.recurringTransactions.toArray()).filter(r => r.isActive)
   if (!actives.length) return 0
@@ -100,7 +103,7 @@ export async function applyDueRecurring() {
   let applied = 0
   for (const rec of actives) {
     const existing = await db.transactions.where('recurringId').equals(rec.uuid).toArray()
-    const appliedMonths = new Set(existing.map(t => t.month))
+    const appliedByMonth = Object.fromEntries(existing.map(t => [t.month, t]))
 
     const endStr = rec.endMonth && rec.endMonth < currentMonthStr ? rec.endMonth : currentMonthStr
     let [y, m] = rec.startMonth.split('-').map(Number)
@@ -111,14 +114,21 @@ export async function applyDueRecurring() {
       const daysInMonth = new Date(y, m, 0).getDate()
       const targetDay = Math.min(rec.dayOfMonth, daysInMonth)
 
-      // For the current month only apply once the target day has arrived
       if (monthStr === currentMonthStr && today < targetDay) break
 
-      if (!appliedMonths.has(monthStr)) {
+      const existingTxn = appliedByMonth[monthStr]
+
+      if (!existingTxn) {
+        // Current month → stamp today. Past month → stamp last day of that month
+        // (the month is over; last day is the closest honest date we can give).
+        const ts = monthStr === currentMonthStr
+          ? nowTimestamp
+          : new Date(y, m, 0).getTime()
+
         await db.transactions.add({
           uuid: crypto.randomUUID(),
           recurringId: rec.uuid,
-          timestamp: new Date(y, m - 1, targetDay).getTime(),
+          timestamp: ts,
           month: monthStr,
           description: rec.description,
           amount: rec.amount,
@@ -129,6 +139,13 @@ export async function applyDueRecurring() {
           aiTagged: false,
         })
         applied++
+      } else if (monthStr === currentMonthStr) {
+        // Fix already-created current-month transactions that carry the old
+        // scheduled-day date — update them to today's date.
+        const storedDay = new Date(existingTxn.timestamp).getDate()
+        if (storedDay !== today) {
+          await db.transactions.update(existingTxn.id, { timestamp: nowTimestamp })
+        }
       }
 
       m++
