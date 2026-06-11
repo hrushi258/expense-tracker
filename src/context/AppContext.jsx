@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { db, seedDefaults, applyDueRecurring, DEFAULT_PILLARS, PILLAR_META } from '../db/db'
 import { getCurrentMonth } from '../utils/formatters'
 
@@ -31,6 +31,8 @@ export function AppProvider({ children }) {
   const [settings, setSettingsState] = useState({ apiKey: '' })
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [isReady, setIsReady] = useState(false)
+  const [recurringApplied, setRecurringApplied] = useState(0)
+  const clearRecurringApplied = useCallback(() => setRecurringApplied(0), [])
 
   const triggerRefresh = useCallback(() => setRefreshTrigger(t => t + 1), [])
 
@@ -50,21 +52,28 @@ export function AppProvider({ children }) {
   }, [])
 
   useEffect(() => {
-    seedDefaults()
-      .then(() => applyDueRecurring())
-      .then(() => Promise.all([
-        db.categories.toArray(),
-        db.pillars.toArray(),
-      ]))
-      .then(([cats, pillars]) => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        await seedDefaults()
+        const count = await applyDueRecurring()
+        const [cats, pillars] = await Promise.all([
+          db.categories.toArray(),
+          db.pillars.toArray(),
+        ])
+        if (cancelled) return
         const sorted = [...pillars].sort((a, b) => a.id - b.id)
         const meta = Object.fromEntries(sorted.map(p => [p.key, p]))
         setCategories(cats.filter(c => !c.isArchived))
         setPillarList(sorted)
         setPillarMeta(meta)
         setIsReady(true)
-      })
-      .catch(console.error)
+        if (count > 0) setRecurringApplied(count)
+      } catch (err) {
+        console.error(err)
+      }
+    })()
+    return () => { cancelled = true }
   }, [refreshTrigger])
 
   useEffect(() => {
@@ -87,6 +96,7 @@ export function AppProvider({ children }) {
       monthConfig, setMonthConfig,
       settings, setSettings,
       isReady,
+      recurringApplied, clearRecurringApplied,
     }}>
       {children}
     </AppContext.Provider>

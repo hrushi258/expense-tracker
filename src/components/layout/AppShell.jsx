@@ -1,6 +1,7 @@
 import React from 'react'
 import { useLocation } from 'react-router-dom'
 import BottomNav from './BottomNav.jsx'
+import RecurringToast from '../ui/RecurringToast.jsx'
 import { useAppContext } from '../../context/AppContext.jsx'
 import { monthToLabel, navigateMonth } from '../../utils/formatters.js'
 
@@ -10,10 +11,11 @@ const PAGE_TITLES = {
   '/history': 'History',
   '/categories': 'Categories',
   '/settings': 'Settings',
+  '/recurring': 'Recurring',
 }
 
 export default function AppShell({ children }) {
-  const { selectedMonth, setSelectedMonth } = useAppContext()
+  const { selectedMonth, setSelectedMonth, recurringApplied, clearRecurringApplied } = useAppContext()
   const location = useLocation()
   const title = PAGE_TITLES[location.pathname]
 
@@ -62,6 +64,9 @@ export default function AppShell({ children }) {
       </main>
 
       <BottomNav />
+      {recurringApplied > 0 && (
+        <RecurringToast count={recurringApplied} onDismiss={clearRecurringApplied} />
+      )}
     </div>
   )
 }
