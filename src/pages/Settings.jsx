@@ -128,6 +128,14 @@ export default function Settings() {
             <p className="text-xs text-slate-400">Manage pillars & subcategories</p>
           </div>
         </button>
+        <button onClick={() => navigate('/recurring')}
+          className="col-span-2 flex items-center gap-3 bg-white rounded-2xl shadow-card px-4 py-3.5 text-left hover:bg-slate-50 transition-colors">
+          <span className="text-xl">🔄</span>
+          <div>
+            <p className="text-sm font-semibold text-slate-700">Recurring Transactions</p>
+            <p className="text-xs text-slate-400">Auto-apply rent, salary, SIPs on a set date</p>
+          </div>
+        </button>
       </div>
 
       <div className="flex items-center gap-2 text-xs text-slate-500 mb-2">

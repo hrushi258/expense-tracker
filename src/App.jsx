@@ -7,6 +7,7 @@ import Transactions from './pages/Transactions.jsx'
 import History from './pages/History.jsx'
 import Categories from './pages/Categories.jsx'
 import Settings from './pages/Settings.jsx'
+import Recurring from './pages/Recurring.jsx'
 
 export default function App() {
   const { isReady } = useAppContext()
@@ -33,6 +34,7 @@ export default function App() {
           <Route path="/history" element={<History />} />
           <Route path="/categories" element={<Categories />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/recurring" element={<Recurring />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AppShell>

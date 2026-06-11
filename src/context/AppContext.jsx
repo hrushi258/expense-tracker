@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
-import { db, seedDefaults, DEFAULT_PILLARS, PILLAR_META } from '../db/db'
+import { db, seedDefaults, applyDueRecurring, DEFAULT_PILLARS, PILLAR_META } from '../db/db'
 import { getCurrentMonth } from '../utils/formatters'
 
 const AppContext = createContext(null)
@@ -51,6 +51,7 @@ export function AppProvider({ children }) {
 
   useEffect(() => {
     seedDefaults()
+      .then(() => applyDueRecurring())
       .then(() => Promise.all([
         db.categories.toArray(),
         db.pillars.toArray(),

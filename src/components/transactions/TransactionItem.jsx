@@ -49,6 +49,11 @@ export default function TransactionItem({ txn, categories }) {
                 {txn.costType}
               </span>
             )}
+            {txn.recurringId && (
+              <span className="text-xs px-1.5 py-0.5 rounded-md font-medium bg-violet-50 text-violet-500">
+                🔁 recurring
+              </span>
+            )}
           </div>
         </div>
 

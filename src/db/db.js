@@ -15,6 +15,14 @@ db.version(2).stores({
   pillars: '++id, key',
 })
 
+db.version(3).stores({
+  transactions: '++id, uuid, timestamp, month, mainCategory, subCategoryId, type, costType, recurringId',
+  categories: '++id, uuid, pillar, name',
+  monthConfig: 'month',
+  pillars: '++id, key',
+  recurringTransactions: '++id, uuid',
+})
+
 export const DEFAULT_PILLARS = [
   { key: 'needs',       label: 'Needs',       icon: '🏠', color: '#4F46E5', lightColor: '#EEF2FF', defaultBudget: 50, isDefault: true },
   { key: 'wants',       label: 'Wants',       icon: '✨', color: '#EC4899', lightColor: '#FDF2F8', defaultBudget: 30, isDefault: true },
@@ -78,3 +86,54 @@ export async function seedDefaults() {
 }
 
 export const seedDefaultCategories = seedDefaults
+
+export async function applyDueRecurring() {
+  const now = new Date()
+  const today = now.getDate()
+  const cy = now.getFullYear()
+  const cm = now.getMonth() + 1
+  const currentMonthStr = `${cy}-${String(cm).padStart(2, '0')}`
+
+  const actives = (await db.recurringTransactions.toArray()).filter(r => r.isActive)
+  if (!actives.length) return 0
+
+  let applied = 0
+  for (const rec of actives) {
+    const existing = await db.transactions.where('recurringId').equals(rec.uuid).toArray()
+    const appliedMonths = new Set(existing.map(t => t.month))
+
+    const endStr = rec.endMonth && rec.endMonth < currentMonthStr ? rec.endMonth : currentMonthStr
+    let [y, m] = rec.startMonth.split('-').map(Number)
+    const [ey, em] = endStr.split('-').map(Number)
+
+    while (y < ey || (y === ey && m <= em)) {
+      const monthStr = `${y}-${String(m).padStart(2, '0')}`
+      const daysInMonth = new Date(y, m, 0).getDate()
+      const targetDay = Math.min(rec.dayOfMonth, daysInMonth)
+
+      // For the current month only apply once the target day has arrived
+      if (monthStr === currentMonthStr && today < targetDay) break
+
+      if (!appliedMonths.has(monthStr)) {
+        await db.transactions.add({
+          uuid: crypto.randomUUID(),
+          recurringId: rec.uuid,
+          timestamp: new Date(y, m - 1, targetDay).getTime(),
+          month: monthStr,
+          description: rec.description,
+          amount: rec.amount,
+          type: rec.type,
+          mainCategory: rec.mainCategory,
+          subCategoryId: rec.subCategoryId || null,
+          costType: rec.costType || 'variable',
+          aiTagged: false,
+        })
+        applied++
+      }
+
+      m++
+      if (m > 12) { m = 1; y++ }
+    }
+  }
+  return applied
+}
