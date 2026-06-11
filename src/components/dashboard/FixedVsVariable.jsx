@@ -1,26 +1,25 @@
 import React from 'react'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts'
-import { PILLAR_META, PILLARS } from '../../db/db.js'
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { useAppContext } from '../../context/AppContext.jsx'
 import { formatCurrency } from '../../utils/formatters.js'
 
 export default function FixedVsVariable({ transactions }) {
+  const { pillarList } = useAppContext()
   const expenses = transactions.filter(t => t.type === 'expense')
 
-  const data = PILLARS.map(p => {
-    const pillarExpenses = expenses.filter(t => t.mainCategory === p)
+  const data = pillarList.map(p => {
+    const pl = expenses.filter(t => t.mainCategory === p.key)
     return {
-      name: PILLAR_META[p].label.slice(0, 4),
-      Fixed: pillarExpenses.filter(t => t.costType === 'fixed').reduce((s, t) => s + t.amount, 0),
-      Variable: pillarExpenses.filter(t => t.costType === 'variable').reduce((s, t) => s + t.amount, 0),
+      name: p.label.slice(0, 5),
+      Fixed: pl.filter(t => t.costType === 'fixed').reduce((s, t) => s + t.amount, 0),
+      Variable: pl.filter(t => t.costType === 'variable').reduce((s, t) => s + t.amount, 0),
     }
   }).filter(d => d.Fixed > 0 || d.Variable > 0)
 
-  const totalFixed = expenses.filter(t => t.costType === 'fixed').reduce((s, t) => s + t.amount, 0)
+  const totalFixed    = expenses.filter(t => t.costType === 'fixed').reduce((s, t) => s + t.amount, 0)
   const totalVariable = expenses.filter(t => t.costType === 'variable').reduce((s, t) => s + t.amount, 0)
 
-  if (data.length === 0) {
-    return null
-  }
+  if (data.length === 0) return null
 
   return (
     <div className="px-4 mt-4">
@@ -51,7 +50,7 @@ export default function FixedVsVariable({ transactions }) {
               formatter={(value) => [formatCurrency(value), '']}
               contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', fontSize: 12 }}
             />
-            <Bar dataKey="Fixed" fill="#6366F1" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="Fixed"    fill="#6366F1" radius={[4, 4, 0, 0]} />
             <Bar dataKey="Variable" fill="#FB923C" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>

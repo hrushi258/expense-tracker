@@ -1,78 +1,197 @@
 import React, { useState } from 'react'
 import { useAppContext } from '../context/AppContext.jsx'
-import { db, PILLAR_META, PILLARS } from '../db/db.js'
+import { db } from '../db/db.js'
 import Modal from '../components/ui/Modal.jsx'
 
-const BLANK = { name: '', pillar: 'needs', costType: 'variable', icon: '📦' }
-const ICON_SUGGESTIONS = ['🏠','🛒','⚡','📱','🚗','💊','🛡️','📚','🍽️','🎬','👕','📺','✈️','💇','💻','🎁','🏦','📈','🔄','💰','📊','📉','🏛️','🥇','₿','🎓','🏋️','🎮','🌿','🍕']
+const CATEGORY_ICONS = ['🏠','🛒','⚡','📱','🚗','💊','🛡️','📚','🍽️','🎬','👕','📺','✈️','💇','💻','🎁','🏦','📈','🔄','💰','📊','📉','🏛️','🥇','₿','🎓','🏋️','🎮','🌿','🍕','🧴','🐾','👶','🔧','⚙️']
+
+const PILLAR_ICONS = ['🏠','✨','🏦','📊','💼','🌱','🎯','💡','🔥','⚡','🌟','💎','🎁','🏆','🎓','🚀','💪','🌍','💰','📈','🧩','🎨','🌈','🏗️','🔑']
+
+const PRESET_COLORS = [
+  { color: '#4F46E5', lightColor: '#EEF2FF' },
+  { color: '#EC4899', lightColor: '#FDF2F8' },
+  { color: '#10B981', lightColor: '#ECFDF5' },
+  { color: '#F59E0B', lightColor: '#FFFBEB' },
+  { color: '#0EA5E9', lightColor: '#F0F9FF' },
+  { color: '#8B5CF6', lightColor: '#F5F3FF' },
+  { color: '#F43F5E', lightColor: '#FFF1F2' },
+  { color: '#F97316', lightColor: '#FFF7ED' },
+  { color: '#14B8A6', lightColor: '#F0FDFA' },
+  { color: '#84CC16', lightColor: '#F7FEE7' },
+]
+
+const BLANK_CATEGORY = { name: '', pillar: '', costType: 'variable', icon: '📦' }
+const BLANK_PILLAR = { label: '', icon: '🎯', color: '#8B5CF6', lightColor: '#F5F3FF' }
+
+function toPillarKey(label) {
+  return label.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '').slice(0, 24) || `pillar_${Date.now()}`
+}
 
 export default function Categories() {
-  const { categories, triggerRefresh } = useAppContext()
-  const [modalOpen, setModalOpen] = useState(false)
-  const [editing, setEditing] = useState(null)
-  const [form, setForm] = useState(BLANK)
-  const [saving, setSaving] = useState(false)
-  const [activeTab, setActiveTab] = useState('needs')
+  const { categories, pillarList, pillarMeta, triggerRefresh } = useAppContext()
 
-  const openAdd = () => { setEditing(null); setForm(BLANK); setModalOpen(true) }
-  const openEdit = (cat) => {
-    setEditing(cat)
-    setForm({ name: cat.name, pillar: cat.pillar, costType: cat.costType, icon: cat.icon })
-    setModalOpen(true)
+  // Category state
+  const [activeTab, setActiveTab] = useState(null)
+  const [catModal, setCatModal] = useState(false)
+  const [editingCat, setEditingCat] = useState(null)
+  const [catForm, setCatForm] = useState(BLANK_CATEGORY)
+
+  // Pillar state
+  const [pillarModal, setPillarModal] = useState(false)
+  const [editingPillar, setEditingPillar] = useState(null)
+  const [pillarForm, setPillarForm] = useState(BLANK_PILLAR)
+  const [saving, setSaving] = useState(false)
+
+  const currentTab = activeTab || pillarList[0]?.key
+
+  // ── Category handlers ──────────────────────────────────────────
+  const openAddCat = () => {
+    setEditingCat(null)
+    setCatForm({ ...BLANK_CATEGORY, pillar: currentTab })
+    setCatModal(true)
   }
 
-  const handleSave = async () => {
-    if (!form.name.trim()) return
+  const openEditCat = (cat) => {
+    setEditingCat(cat)
+    setCatForm({ name: cat.name, pillar: cat.pillar, costType: cat.costType, icon: cat.icon })
+    setCatModal(true)
+  }
+
+  const saveCat = async () => {
+    if (!catForm.name.trim()) return
     setSaving(true)
     try {
-      if (editing) {
-        await db.categories.update(editing.id, { ...form, name: form.name.trim() })
+      if (editingCat) {
+        await db.categories.update(editingCat.id, { ...catForm, name: catForm.name.trim() })
       } else {
-        await db.categories.add({ ...form, name: form.name.trim(), uuid: crypto.randomUUID(), isDefault: false, isArchived: false })
+        await db.categories.add({ ...catForm, name: catForm.name.trim(), uuid: crypto.randomUUID(), isDefault: false, isArchived: false })
       }
       triggerRefresh()
-      setModalOpen(false)
+      setCatModal(false)
     } finally {
       setSaving(false)
     }
   }
 
-  const handleArchive = async (cat) => {
+  const archiveCat = async (cat) => {
     if (cat.isDefault) return
     await db.categories.update(cat.id, { isArchived: true })
     triggerRefresh()
   }
 
-  const tabCategories = categories.filter(c => c.pillar === activeTab)
+  // ── Pillar handlers ────────────────────────────────────────────
+  const openAddPillar = () => {
+    setEditingPillar(null)
+    setPillarForm(BLANK_PILLAR)
+    setPillarModal(true)
+  }
+
+  const openEditPillar = (pillar) => {
+    setEditingPillar(pillar)
+    setPillarForm({ label: pillar.label, icon: pillar.icon, color: pillar.color, lightColor: pillar.lightColor })
+    setPillarModal(true)
+  }
+
+  const savePillar = async () => {
+    if (!pillarForm.label.trim()) return
+    setSaving(true)
+    try {
+      if (editingPillar) {
+        await db.pillars.update(editingPillar.id, {
+          label: pillarForm.label.trim(),
+          icon: pillarForm.icon,
+          color: pillarForm.color,
+          lightColor: pillarForm.lightColor,
+        })
+      } else {
+        const key = toPillarKey(pillarForm.label)
+        const exists = pillarList.some(p => p.key === key)
+        await db.pillars.add({
+          key: exists ? `${key}_${Date.now()}` : key,
+          label: pillarForm.label.trim(),
+          icon: pillarForm.icon,
+          color: pillarForm.color,
+          lightColor: pillarForm.lightColor,
+          defaultBudget: 0,
+          isDefault: false,
+        })
+      }
+      triggerRefresh()
+      setPillarModal(false)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const tabCategories = categories.filter(c => c.pillar === currentTab)
+  const currentPillar = pillarMeta[currentTab]
 
   return (
     <div className="pb-4">
       <div className="px-4 pt-4">
-        {/* Pillar tabs */}
-        <div className="flex gap-1 bg-slate-100 p-1 rounded-xl mb-4">
-          {PILLARS.map(p => (
+
+        {/* ── Pillars section ──────────────────────────────── */}
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Pillars</h2>
             <button
-              key={p}
-              onClick={() => setActiveTab(p)}
-              className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-all ${
-                activeTab === p ? 'bg-white shadow-sm text-slate-700' : 'text-slate-400'
-              }`}
+              onClick={openAddPillar}
+              className="flex items-center gap-1 text-xs font-semibold text-needs px-2.5 py-1.5 rounded-lg bg-needs-light hover:bg-indigo-100 transition-colors"
             >
-              {PILLAR_META[p].label}
+              <svg viewBox="0 0 24 24" fill="none" className="w-3.5 h-3.5" stroke="currentColor" strokeWidth={2.5}>
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              Add Pillar
             </button>
-          ))}
+          </div>
+
+          <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-1">
+            {pillarList.map(p => (
+              <div
+                key={p.key}
+                className={`flex-shrink-0 flex items-center gap-2 pl-3 pr-1 py-2 rounded-xl border-2 transition-all cursor-pointer ${
+                  currentTab === p.key ? 'border-transparent' : 'border-slate-200 bg-white'
+                }`}
+                style={currentTab === p.key ? { backgroundColor: p.color, borderColor: p.color } : {}}
+                onClick={() => setActiveTab(p.key)}
+              >
+                <span className="text-sm">{p.icon}</span>
+                <span className={`text-sm font-semibold ${currentTab === p.key ? 'text-white' : 'text-slate-600'}`}>
+                  {p.label}
+                </span>
+                <button
+                  onClick={(e) => { e.stopPropagation(); openEditPillar(p) }}
+                  className={`p-1 rounded-lg transition-colors ${
+                    currentTab === p.key ? 'text-white/70 hover:text-white hover:bg-white/20' : 'text-slate-300 hover:text-slate-600 hover:bg-slate-100'
+                  }`}
+                  title="Edit pillar"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" className="w-3.5 h-3.5" stroke="currentColor" strokeWidth={2}>
+                    <path d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
 
-        {/* Category list */}
+        {/* ── Subcategories for selected pillar ──────────── */}
+        {currentPillar && (
+          <div
+            className="text-xs font-semibold uppercase tracking-wide mb-3 flex items-center gap-2"
+            style={{ color: currentPillar.color }}
+          >
+            <span>{currentPillar.icon}</span>
+            <span>{currentPillar.label} — Subcategories</span>
+          </div>
+        )}
+
         <div className="space-y-2">
           {tabCategories.map(cat => (
-            <div
-              key={cat.id}
-              className="flex items-center gap-3 bg-white rounded-2xl shadow-card px-4 py-3"
-            >
+            <div key={cat.id} className="flex items-center gap-3 bg-white rounded-2xl shadow-card px-4 py-3">
               <div
                 className="w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
-                style={{ backgroundColor: PILLAR_META[cat.pillar].light }}
+                style={{ backgroundColor: currentPillar?.lightColor || '#F1F5F9' }}
               >
                 {cat.icon}
               </div>
@@ -86,7 +205,7 @@ export default function Categories() {
               </div>
               <div className="flex gap-2">
                 <button
-                  onClick={() => openEdit(cat)}
+                  onClick={() => openEditCat(cat)}
                   className="p-2 rounded-lg text-slate-400 hover:text-needs hover:bg-needs-light transition-colors"
                 >
                   <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth={2}>
@@ -95,7 +214,7 @@ export default function Categories() {
                 </button>
                 {!cat.isDefault && (
                   <button
-                    onClick={() => handleArchive(cat)}
+                    onClick={() => archiveCat(cat)}
                     className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
                   >
                     <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth={2}>
@@ -109,36 +228,35 @@ export default function Categories() {
 
           {tabCategories.length === 0 && (
             <div className="bg-white rounded-2xl shadow-card p-8 text-center">
-              <p className="text-slate-400 text-sm">No categories yet. Add one below.</p>
+              <p className="text-slate-400 text-sm">No subcategories yet. Add one below.</p>
             </div>
           )}
         </div>
 
         <button
-          onClick={openAdd}
+          onClick={openAddCat}
           className="mt-4 w-full py-3.5 rounded-2xl border-2 border-dashed border-slate-200 text-slate-400 text-sm font-semibold hover:border-needs hover:text-needs transition-colors flex items-center justify-center gap-2"
         >
           <svg viewBox="0 0 24 24" fill="none" className="w-4 h-4" stroke="currentColor" strokeWidth={2.5}>
             <path d="M12 5v14M5 12h14" />
           </svg>
-          Add Category
+          Add Subcategory
         </button>
       </div>
 
-      {/* Add / Edit modal */}
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Edit Category' : 'New Category'}>
+      {/* ── Category modal ───────────────────────────────── */}
+      <Modal open={catModal} onClose={() => setCatModal(false)} title={editingCat ? 'Edit Subcategory' : 'New Subcategory'}>
         <div className="space-y-4">
-          {/* Icon picker */}
           <div>
             <label className="block text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">Icon</label>
             <div className="flex flex-wrap gap-2">
-              {ICON_SUGGESTIONS.map(ic => (
+              {CATEGORY_ICONS.map(ic => (
                 <button
                   key={ic}
                   type="button"
-                  onClick={() => setForm(f => ({ ...f, icon: ic }))}
+                  onClick={() => setCatForm(f => ({ ...f, icon: ic }))}
                   className={`w-9 h-9 rounded-xl text-lg flex items-center justify-center transition-all ${
-                    form.icon === ic ? 'bg-needs-light ring-2 ring-needs' : 'bg-slate-100'
+                    catForm.icon === ic ? 'bg-needs-light ring-2 ring-needs' : 'bg-slate-100'
                   }`}
                 >
                   {ic}
@@ -147,39 +265,36 @@ export default function Categories() {
             </div>
           </div>
 
-          {/* Name */}
           <div>
             <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Name</label>
             <input
               type="text"
-              value={form.name}
-              onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+              value={catForm.name}
+              onChange={e => setCatForm(f => ({ ...f, name: e.target.value }))}
               placeholder="e.g. Pet care"
               className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:ring-2 focus:ring-needs/30 focus:border-needs transition"
             />
           </div>
 
-          {/* Pillar */}
           <div>
             <label className="block text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">Pillar</label>
             <div className="grid grid-cols-2 gap-2">
-              {PILLARS.map(p => (
+              {pillarList.map(p => (
                 <button
-                  key={p}
+                  key={p.key}
                   type="button"
-                  onClick={() => setForm(f => ({ ...f, pillar: p }))}
-                  className={`py-2.5 rounded-xl text-sm font-semibold border-2 transition-all ${
-                    form.pillar === p ? 'text-white border-transparent' : 'border-slate-200 text-slate-500 bg-white'
-                  }`}
-                  style={form.pillar === p ? { backgroundColor: PILLAR_META[p].color } : {}}
+                  onClick={() => setCatForm(f => ({ ...f, pillar: p.key }))}
+                  className="py-2.5 rounded-xl text-sm font-semibold border-2 transition-all"
+                  style={catForm.pillar === p.key
+                    ? { backgroundColor: p.color, borderColor: p.color, color: 'white' }
+                    : { borderColor: '#e2e8f0', color: '#64748b', backgroundColor: 'white' }}
                 >
-                  {PILLAR_META[p].label}
+                  {p.icon} {p.label}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Cost type */}
           <div>
             <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Cost Behavior</label>
             <div className="flex rounded-xl bg-slate-100 p-1 gap-1">
@@ -187,9 +302,9 @@ export default function Categories() {
                 <button
                   key={ct}
                   type="button"
-                  onClick={() => setForm(f => ({ ...f, costType: ct }))}
+                  onClick={() => setCatForm(f => ({ ...f, costType: ct }))}
                   className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all capitalize ${
-                    form.costType === ct ? 'bg-white text-slate-700 shadow-sm' : 'text-slate-400'
+                    catForm.costType === ct ? 'bg-white text-slate-700 shadow-sm' : 'text-slate-400'
                   }`}
                 >
                   {ct}
@@ -199,11 +314,88 @@ export default function Categories() {
           </div>
 
           <button
-            onClick={handleSave}
-            disabled={!form.name.trim() || saving}
+            onClick={saveCat}
+            disabled={!catForm.name.trim() || !catForm.pillar || saving}
             className="w-full py-3 rounded-2xl bg-needs text-white font-semibold disabled:opacity-40 transition-opacity"
           >
-            {saving ? 'Saving…' : editing ? 'Save Changes' : 'Create Category'}
+            {saving ? 'Saving…' : editingCat ? 'Save Changes' : 'Create Subcategory'}
+          </button>
+        </div>
+      </Modal>
+
+      {/* ── Pillar modal ─────────────────────────────────── */}
+      <Modal open={pillarModal} onClose={() => setPillarModal(false)} title={editingPillar ? 'Edit Pillar' : 'New Pillar'}>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Name</label>
+            <input
+              type="text"
+              value={pillarForm.label}
+              onChange={e => setPillarForm(f => ({ ...f, label: e.target.value }))}
+              placeholder="e.g. Business"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:ring-2 focus:ring-needs/30 focus:border-needs transition"
+            />
+            {!editingPillar && pillarForm.label && (
+              <p className="text-xs text-slate-400 mt-1">Key: <code>{toPillarKey(pillarForm.label)}</code></p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">Icon</label>
+            <div className="flex flex-wrap gap-2">
+              {PILLAR_ICONS.map(ic => (
+                <button
+                  key={ic}
+                  type="button"
+                  onClick={() => setPillarForm(f => ({ ...f, icon: ic }))}
+                  className="w-10 h-10 rounded-xl text-xl flex items-center justify-center transition-all"
+                  style={pillarForm.icon === ic
+                    ? { backgroundColor: pillarForm.lightColor, outline: `2px solid ${pillarForm.color}` }
+                    : { backgroundColor: '#f1f5f9' }}
+                >
+                  {ic}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wide">Color</label>
+            <div className="flex flex-wrap gap-2">
+              {PRESET_COLORS.map(({ color, lightColor }) => (
+                <button
+                  key={color}
+                  type="button"
+                  onClick={() => setPillarForm(f => ({ ...f, color, lightColor }))}
+                  className="w-8 h-8 rounded-full transition-transform hover:scale-110"
+                  style={{
+                    backgroundColor: color,
+                    outline: pillarForm.color === color ? `3px solid ${color}` : 'none',
+                    outlineOffset: 2,
+                  }}
+                />
+              ))}
+            </div>
+
+            {/* Preview */}
+            <div
+              className="mt-3 flex items-center gap-2 px-3 py-2.5 rounded-xl"
+              style={{ backgroundColor: pillarForm.lightColor }}
+            >
+              <span className="text-lg">{pillarForm.icon}</span>
+              <span className="text-sm font-semibold" style={{ color: pillarForm.color }}>
+                {pillarForm.label || 'Preview'}
+              </span>
+            </div>
+          </div>
+
+          <button
+            onClick={savePillar}
+            disabled={!pillarForm.label.trim() || saving}
+            className="w-full py-3 rounded-2xl text-white font-semibold disabled:opacity-40 transition-opacity"
+            style={{ backgroundColor: pillarForm.color }}
+          >
+            {saving ? 'Saving…' : editingPillar ? 'Save Changes' : 'Create Pillar'}
           </button>
         </div>
       </Modal>

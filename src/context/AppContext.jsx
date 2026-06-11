@@ -1,20 +1,32 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
-import { db, seedDefaultCategories } from '../db/db'
+import { db, seedDefaults, DEFAULT_PILLARS, PILLAR_META } from '../db/db'
 import { getCurrentMonth } from '../utils/formatters'
 
 const AppContext = createContext(null)
 
 const DEFAULT_MONTH_CONFIG = {
   income: 0,
-  budgetNeeds: 50,
-  budgetWants: 30,
-  budgetSavings: 10,
-  budgetInvestments: 10,
+  budget_needs: 50,
+  budget_wants: 30,
+  budget_savings: 10,
+  budget_investments: 10,
+}
+
+// Read budget for a pillar — supports both old camelCase format and new budget_{key} format
+const OLD_KEYS = { needs: 'budgetNeeds', wants: 'budgetWants', savings: 'budgetSavings', investments: 'budgetInvestments' }
+export function readBudget(config, pillarKey, defaultVal = 0) {
+  const newKey = `budget_${pillarKey}`
+  if (config[newKey] != null) return config[newKey]
+  const oldKey = OLD_KEYS[pillarKey]
+  if (oldKey && config[oldKey] != null) return config[oldKey]
+  return defaultVal
 }
 
 export function AppProvider({ children }) {
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth)
   const [categories, setCategories] = useState([])
+  const [pillarList, setPillarList] = useState(DEFAULT_PILLARS)
+  const [pillarMeta, setPillarMeta] = useState(PILLAR_META)
   const [monthConfig, setMonthConfigState] = useState(DEFAULT_MONTH_CONFIG)
   const [settings, setSettingsState] = useState({ apiKey: '' })
   const [refreshTrigger, setRefreshTrigger] = useState(0)
@@ -38,10 +50,17 @@ export function AppProvider({ children }) {
   }, [])
 
   useEffect(() => {
-    seedDefaultCategories()
-      .then(() => db.categories.toArray())
-      .then(cats => {
+    seedDefaults()
+      .then(() => Promise.all([
+        db.categories.toArray(),
+        db.pillars.toArray(),
+      ]))
+      .then(([cats, pillars]) => {
+        const sorted = [...pillars].sort((a, b) => a.id - b.id)
+        const meta = Object.fromEntries(sorted.map(p => [p.key, p]))
         setCategories(cats.filter(c => !c.isArchived))
+        setPillarList(sorted)
+        setPillarMeta(meta)
         setIsReady(true)
       })
       .catch(console.error)
@@ -63,6 +82,7 @@ export function AppProvider({ children }) {
     <AppContext.Provider value={{
       selectedMonth, setSelectedMonth,
       categories, triggerRefresh,
+      pillarList, pillarMeta,
       monthConfig, setMonthConfig,
       settings, setSettings,
       isReady,

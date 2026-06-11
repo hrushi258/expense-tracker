@@ -1,6 +1,6 @@
 import React from 'react'
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
-import { PILLAR_META, PILLARS } from '../../db/db.js'
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
+import { useAppContext } from '../../context/AppContext.jsx'
 import { formatCurrency } from '../../utils/formatters.js'
 
 const RADIAN = Math.PI / 180
@@ -18,15 +18,14 @@ function CustomLabel({ cx, cy, midAngle, innerRadius, outerRadius, percent }) {
 }
 
 export default function SpendingDonut({ transactions }) {
+  const { pillarList } = useAppContext()
   const expenses = transactions.filter(t => t.type === 'expense')
 
-  const data = PILLARS.map(p => ({
-    name: PILLAR_META[p].label,
-    value: expenses.filter(t => t.mainCategory === p).reduce((s, t) => s + t.amount, 0),
-    color: PILLAR_META[p].color,
+  const data = pillarList.map(p => ({
+    name: p.label,
+    value: expenses.filter(t => t.mainCategory === p.key).reduce((s, t) => s + t.amount, 0),
+    color: p.color,
   })).filter(d => d.value > 0)
-
-  const total = data.reduce((s, d) => s + d.value, 0)
 
   if (data.length === 0) {
     return (
@@ -57,9 +56,7 @@ export default function SpendingDonut({ transactions }) {
               labelLine={false}
               label={<CustomLabel />}
             >
-              {data.map((entry, i) => (
-                <Cell key={i} fill={entry.color} />
-              ))}
+              {data.map((entry, i) => <Cell key={i} fill={entry.color} />)}
             </Pie>
             <Tooltip
               formatter={(value) => [formatCurrency(value), '']}
@@ -67,7 +64,6 @@ export default function SpendingDonut({ transactions }) {
             />
           </PieChart>
         </ResponsiveContainer>
-
         <div className="flex flex-wrap gap-2 justify-center mt-1">
           {data.map((d, i) => (
             <div key={i} className="flex items-center gap-1.5 text-xs text-slate-600">
