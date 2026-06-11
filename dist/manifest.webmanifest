@@ -1,1 +1,0 @@
-{"name":"Expense Tracker","short_name":"Expenses","description":"Privacy-first AI personal expense tracker","start_url":"/","display":"standalone","background_color":"#F8FAFC","theme_color":"#4F46E5","lang":"en","scope":"/","orientation":"portrait","icons":[{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]}
