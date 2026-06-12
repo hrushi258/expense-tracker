@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import BottomSheet from '../ui/BottomSheet.jsx'
 import { db } from '../../db/db.js'
 import { applyAccountDelta } from '../../services/ledger.js'
 import { todayDateString } from '../../utils/formatters.js'
+import { useFormSheet } from '../../hooks/useFormSheet.js'
 
 const DEFAULT_FORM = {
   fromId: '',
@@ -12,23 +13,14 @@ const DEFAULT_FORM = {
   date: '',
 }
 
+function getInitialForm() {
+  return { ...DEFAULT_FORM, date: todayDateString() }
+}
+
 export default function TransferSheet({ open, onClose, accounts, onSaved }) {
   // accounts: all non-archived liquid + emergency asset accounts
-  const [form, setForm] = useState(DEFAULT_FORM)
+  const { form, setForm, errors, setErrors, set } = useFormSheet(open, null, getInitialForm)
   const [saving, setSaving] = useState(false)
-  const [errors, setErrors] = useState({})
-
-  useEffect(() => {
-    if (open) {
-      setForm({ ...DEFAULT_FORM, date: todayDateString() })
-      setErrors({})
-    }
-  }, [open])
-
-  const set = (key) => (e) => {
-    setForm(f => ({ ...f, [key]: e.target.value }))
-    setErrors(err => ({ ...err, [key]: undefined }))
-  }
 
   const fromAccount = accounts.find(a => a.uuid === form.fromId)
   const availableBalance = fromAccount?.balance || 0
