@@ -8,6 +8,7 @@ const ACCOUNT_TYPES = {
     { value: 'salary',   label: 'Salary Account',  icon: '💼' },
     { value: 'savings',  label: 'Savings Account',  icon: '🏦' },
     { value: 'checking', label: 'Current Account',  icon: '🏛️' },
+    { value: 'cash',     label: 'Cash in Hand',     icon: '💵' },
   ],
   growth: [
     { value: 'mutual_fund', label: 'Mutual Funds / SIP', icon: '📊' },

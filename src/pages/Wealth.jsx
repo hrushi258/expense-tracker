@@ -5,6 +5,7 @@ import { fdMaturityValue, fdInterestEarned, daysUntilMaturity, fdProgressPercent
 
 import AssetAllocationRing from '../components/wealth/AssetAllocationRing.jsx'
 import SnapshotUpdateSheet from '../components/wealth/SnapshotUpdateSheet.jsx'
+import TransferSheet from '../components/wealth/TransferSheet.jsx'
 import AssetAccountFormSheet from '../components/wealth/AssetAccountFormSheet.jsx'
 import FDFormSheet from '../components/wealth/FDFormSheet.jsx'
 import MaturityTimeline from '../components/wealth/MaturityTimeline.jsx'
@@ -234,6 +235,7 @@ export default function Wealth() {
 
   // Sheet states
   const [snapshotTarget, setSnapshotTarget] = useState(null)
+  const [transferOpen, setTransferOpen] = useState(false)
   const [accountFormTarget, setAccountFormTarget] = useState(null)
   const [accountFormOpen, setAccountFormOpen] = useState(false)
   const [fdFormTarget, setFDFormTarget] = useState(null)
@@ -274,7 +276,10 @@ export default function Wealth() {
     for (const card of activeCards) {
       const lastSettled = card.lastSettledAt || 0
       const outstanding = allTxns
-        .filter(t => t.paymentMethod === card.uuid && t.timestamp > lastSettled)
+        .filter(t => {
+          const isCC = t.paymentMethod === card.uuid || t.paidVia === `card:${card.uuid}`
+          return isCC && t.timestamp > lastSettled
+        })
         .reduce((s, t) => s + (t.amount || 0), 0)
       stats[card.uuid] = outstanding
     }
@@ -345,7 +350,20 @@ export default function Wealth() {
 
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">Your Accounts</h2>
-              <AddButton label="Add Account" onClick={() => { setAccountFormTarget(null); setAccountFormOpen(true) }} />
+              <div className="flex items-center gap-2">
+                {accounts.length >= 2 && (
+                  <button
+                    onClick={() => setTransferOpen(true)}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-600 text-sm font-semibold active:scale-95 transition-transform"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" className="w-3.5 h-3.5" stroke="currentColor" strokeWidth={2}>
+                      <path d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4" />
+                    </svg>
+                    Transfer
+                  </button>
+                )}
+                <AddButton label="Add Account" onClick={() => { setAccountFormTarget(null); setAccountFormOpen(true) }} />
+              </div>
             </div>
 
             {accounts.length === 0 ? (
@@ -542,6 +560,13 @@ export default function Wealth() {
         onClose={() => setSnapshotTarget(null)}
         account={snapshotTarget}
         onUpdated={reload}
+      />
+
+      <TransferSheet
+        open={transferOpen}
+        onClose={() => setTransferOpen(false)}
+        accounts={accounts.filter(a => a.accountGroup === 'liquid' || a.accountGroup === 'emergency')}
+        onSaved={reload}
       />
 
       <AssetAccountFormSheet

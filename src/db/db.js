@@ -30,6 +30,10 @@ db.version(4).stores({
   assetSnapshots: '++id, accountId, snapshotDate',
 })
 
+db.version(5).stores({
+  transfers: '++id, uuid, timestamp, fromAccountId, toAccountId',
+})
+
 export const DEFAULT_PILLARS = [
   { key: 'needs',       label: 'Needs',       icon: '🏠', color: '#4F46E5', lightColor: '#EEF2FF', defaultBudget: 50, isDefault: true },
   { key: 'wants',       label: 'Wants',       icon: '✨', color: '#EC4899', lightColor: '#FDF2F8', defaultBudget: 30, isDefault: true },

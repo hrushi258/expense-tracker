@@ -6,6 +6,8 @@ import { categorizeExpense } from '../../services/gemini.js'
 import { todayDateString } from '../../utils/formatters.js'
 import { useFormSheet } from '../../hooks/useFormSheet.js'
 import CategoryPicker from './CategoryPicker.jsx'
+import PaidViaPicker from './PaidViaPicker.jsx'
+import { applyTxnDelta, reverseTxnDelta } from '../../services/ledger.js'
 
 const DEFAULT_FORM = {
   type: 'expense',
@@ -15,11 +17,14 @@ const DEFAULT_FORM = {
   mainCategory: '',
   subCategoryId: null,
   costType: 'variable',
-  paymentMethod: null,
+  paidVia: null,
 }
 
 function getInitialForm(prefill) {
   if (!prefill) return { ...DEFAULT_FORM, date: todayDateString() }
+  // Legacy transactions used paymentMethod for CC; derive paidVia from it
+  const paidVia = prefill.paidVia
+    || (prefill.paymentMethod ? `card:${prefill.paymentMethod}` : null)
   return {
     type: prefill.type,
     amount: String(prefill.amount),
@@ -28,7 +33,7 @@ function getInitialForm(prefill) {
     mainCategory: prefill.mainCategory || '',
     subCategoryId: prefill.subCategoryId || null,
     costType: prefill.costType || 'variable',
-    paymentMethod: prefill.paymentMethod || null,
+    paidVia,
   }
 }
 
@@ -39,13 +44,17 @@ export default function AddTransactionSheet({ open, onClose, prefillTransaction 
   const [aiError, setAiError] = useState(null)
   const [aiConfidence, setAiConfidence] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [liquidAccounts, setLiquidAccounts] = useState([])
   const [creditCards, setCreditCards] = useState([])
 
   useEffect(() => {
     if (open) {
       setAiError(null)
       setAiConfidence(null)
-      db.creditCards.toArray().then(cards => setCreditCards(cards.filter(c => !c.isArchived)))
+      Promise.all([
+        db.assetAccounts.toArray().then(accs => accs.filter(a => !a.isArchived && a.accountGroup === 'liquid')),
+        db.creditCards.toArray().then(cs => cs.filter(c => !c.isArchived)),
+      ]).then(([accs, cs]) => { setLiquidAccounts(accs); setCreditCards(cs) })
     }
   }, [open])
 
@@ -86,8 +95,12 @@ export default function AddTransactionSheet({ open, onClose, prefillTransaction 
     const monthFromDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
     setSaving(true)
     try {
+      // Keep paymentMethod in sync with paidVia for backward-compatible CC outstanding calc
+      const paymentMethod = form.paidVia?.startsWith('card:')
+        ? form.paidVia.slice('card:'.length)
+        : null
       const payload = {
-        uuid: crypto.randomUUID(),
+        uuid: prefillTransaction?.uuid || crypto.randomUUID(),
         timestamp: d.getTime(),
         month: monthFromDate,
         description: form.description.trim(),
@@ -97,13 +110,18 @@ export default function AddTransactionSheet({ open, onClose, prefillTransaction 
         subCategoryId: form.type === 'income' ? null : (form.subCategoryId ? Number(form.subCategoryId) : null),
         costType: form.type === 'income' ? 'variable' : form.costType,
         aiTagged: aiConfidence !== null,
-        paymentMethod: form.type === 'expense' ? (form.paymentMethod || null) : null,
+        paidVia: form.paidVia || null,
+        paymentMethod,
       }
       if (prefillTransaction?.id) {
+        // Reverse old ledger effect, then apply new one
+        await reverseTxnDelta(prefillTransaction)
         await db.transactions.update(prefillTransaction.id, payload)
       } else {
         await db.transactions.add(payload)
       }
+      // Apply ledger effect for the new/updated transaction
+      await applyTxnDelta({ ...payload, date: form.date })
       triggerRefresh()
       onClose()
     } finally {
@@ -118,7 +136,12 @@ export default function AddTransactionSheet({ open, onClose, prefillTransaction 
         {/* Income / Expense toggle */}
         <div className="flex rounded-xl bg-slate-100 p-1 gap-1">
           {['expense', 'income'].map(t => (
-            <button key={t} type="button" onClick={() => setForm(f => ({ ...f, type: t }))}
+            <button key={t} type="button" onClick={() => setForm(f => ({
+              ...f,
+              type: t,
+              // Clear card paidVia when switching to income — cards don't apply to income
+              paidVia: (t === 'income' && f.paidVia?.startsWith('card:')) ? null : f.paidVia,
+            }))}
               className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-all capitalize ${
                 form.type === t
                   ? t === 'expense' ? 'bg-white text-red-500 shadow-sm' : 'bg-white text-emerald-600 shadow-sm'
@@ -189,36 +212,13 @@ export default function AddTransactionSheet({ open, onClose, prefillTransaction 
             className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm outline-none focus:ring-2 focus:ring-needs/30 focus:border-needs transition" />
         </div>
 
-        {/* Payment Method (expense + credit cards exist) */}
-        {form.type === 'expense' && creditCards.length > 0 && (
-          <div>
-            <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">Payment Method</label>
-            <div className="flex gap-2 flex-wrap">
-              <button
-                type="button"
-                onClick={() => setForm(f => ({ ...f, paymentMethod: null }))}
-                className={`px-3 py-1.5 rounded-xl text-sm font-semibold border-2 transition-all ${
-                  !form.paymentMethod ? 'bg-slate-700 border-slate-700 text-white' : 'border-slate-200 text-slate-500'
-                }`}
-              >
-                Cash / Bank
-              </button>
-              {creditCards.map(card => (
-                <button
-                  key={card.uuid}
-                  type="button"
-                  onClick={() => setForm(f => ({ ...f, paymentMethod: card.uuid }))}
-                  className="px-3 py-1.5 rounded-xl text-sm font-semibold border-2 transition-all"
-                  style={form.paymentMethod === card.uuid
-                    ? { backgroundColor: card.color, borderColor: card.color, color: 'white' }
-                    : { borderColor: '#e2e8f0', color: '#64748b' }}
-                >
-                  {card.name}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Paid Via — shown whenever any accounts or cards exist */}
+        <PaidViaPicker
+          accounts={liquidAccounts}
+          cards={form.type === 'income' ? [] : creditCards}
+          value={form.paidVia}
+          onChange={paidVia => setForm(f => ({ ...f, paidVia }))}
+        />
 
         {/* Category (expense only) */}
         {form.type === 'expense' && (

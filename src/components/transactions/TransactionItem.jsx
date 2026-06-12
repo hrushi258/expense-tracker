@@ -4,6 +4,7 @@ import { formatCurrency, formatShortDate } from '../../utils/formatters.js'
 import { db } from '../../db/db.js'
 import { useAppContext } from '../../context/AppContext.jsx'
 import AddTransactionSheet from './AddTransactionSheet.jsx'
+import { reverseTxnDelta } from '../../services/ledger.js'
 
 export default function TransactionItem({ txn, categories }) {
   const { triggerRefresh } = useAppContext()
@@ -15,6 +16,7 @@ export default function TransactionItem({ txn, categories }) {
 
   const handleDelete = async () => {
     if (window.confirm('Delete this transaction?')) {
+      await reverseTxnDelta(txn)
       await db.transactions.delete(txn.id)
       triggerRefresh()
     }
@@ -53,6 +55,12 @@ export default function TransactionItem({ txn, categories }) {
               <span className="text-xs px-1.5 py-0.5 rounded-md font-medium bg-violet-50 text-violet-500">
                 🔁 recurring
               </span>
+            )}
+            {txn.paidVia?.startsWith('account:') && (
+              <span className="text-xs px-1.5 py-0.5 rounded-md font-medium bg-indigo-50 text-indigo-500">🏦</span>
+            )}
+            {txn.paidVia?.startsWith('card:') && (
+              <span className="text-xs px-1.5 py-0.5 rounded-md font-medium bg-slate-50 text-slate-500">💳</span>
             )}
           </div>
         </div>
