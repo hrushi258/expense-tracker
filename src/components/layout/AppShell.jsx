@@ -12,6 +12,7 @@ const PAGE_TITLES = {
   '/categories': 'Categories',
   '/settings': 'Settings',
   '/recurring': 'Recurring',
+  '/wealth': 'Wealth',
 }
 
 export default function AppShell({ children }) {

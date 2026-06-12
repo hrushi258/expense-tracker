@@ -8,6 +8,7 @@ import History from './pages/History.jsx'
 import Categories from './pages/Categories.jsx'
 import Settings from './pages/Settings.jsx'
 import Recurring from './pages/Recurring.jsx'
+import Wealth from './pages/Wealth.jsx'
 
 export default function App() {
   const { isReady } = useAppContext()
@@ -35,6 +36,7 @@ export default function App() {
           <Route path="/categories" element={<Categories />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/recurring" element={<Recurring />} />
+          <Route path="/wealth" element={<Wealth />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AppShell>

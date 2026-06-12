@@ -23,6 +23,13 @@ db.version(3).stores({
   recurringTransactions: '++id, uuid',
 })
 
+db.version(4).stores({
+  assetAccounts: '++id, uuid',
+  fdRecords: '++id, uuid',
+  creditCards: '++id, uuid',
+  assetSnapshots: '++id, accountId, snapshotDate',
+})
+
 export const DEFAULT_PILLARS = [
   { key: 'needs',       label: 'Needs',       icon: '🏠', color: '#4F46E5', lightColor: '#EEF2FF', defaultBudget: 50, isDefault: true },
   { key: 'wants',       label: 'Wants',       icon: '✨', color: '#EC4899', lightColor: '#FDF2F8', defaultBudget: 30, isDefault: true },
@@ -31,7 +38,6 @@ export const DEFAULT_PILLARS = [
 ]
 
 export const PILLAR_META = Object.fromEntries(DEFAULT_PILLARS.map(p => [p.key, p]))
-export const PILLARS = DEFAULT_PILLARS.map(p => p.key)
 
 const DEFAULT_CATEGORIES = [
   { uuid: 'cat-needs-rent',       name: 'Rent / EMI',            pillar: 'needs',       costType: 'fixed',    icon: '🏠', isDefault: true, isArchived: false },
@@ -84,8 +90,6 @@ export async function seedDefaults() {
     if (cats === 0) await db.categories.bulkAdd(DEFAULT_CATEGORIES)
   })
 }
-
-export const seedDefaultCategories = seedDefaults
 
 export async function applyDueRecurring() {
   const now = new Date()

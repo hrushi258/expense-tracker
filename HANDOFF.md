@@ -1,7 +1,7 @@
 # Expense Tracker — HANDOFF
 
 ## Current State
-Fully built privacy-first PWA for personal expense tracking. All 4 phases from the master plan are implemented. Production build is clean (zero errors). Dev server runs on port 5173.
+Fully built privacy-first PWA for personal expense tracking. All 4 original phases plus the Wealth module (Phase 5) are implemented. Production build is clean (zero errors). Dev server runs on port 5173.
 
 ## Tech Stack
 - Vite 6 + React 18 + React Router v6 (HashRouter)
@@ -13,11 +13,36 @@ Fully built privacy-first PWA for personal expense tracking. All 4 phases from t
 
 ## Architecture
 - `src/context/AppContext.jsx` — global state: selectedMonth, categories, monthConfig, settings
-- `src/db/db.js` — Dexie schema + 25 seeded default categories across 4 pillars
-- `src/services/gemini.js` — AI categorization (description text only, amounts stripped before call)
-- `src/utils/sanitizer.js` — strips all numeric values and currency symbols from text before AI
-- Routes: `/` Dashboard, `/transactions`, `/history`, `/categories`, `/settings`
+- `src/db/db.js` — Dexie schema v4 + 4 original tables + 4 new wealth tables + 25 seeded categories
+- `src/services/gemini.js` — AI categorization (description text only, amounts stripped)
+- `src/services/fdCalculator.js` — FD compound interest math (futureValue, maturityValue, progressPercent)
+- `src/utils/sanitizer.js` — strips numeric values before AI call
+- Routes: `/` Dashboard, `/transactions`, `/history`, `/categories`, `/settings`, `/wealth`
 - Settings (API key + income) stored in localStorage; all financial data in IndexedDB
+- Emergency fund target stored in localStorage under `et_emergency_target` (default: 6)
+
+## Wealth Module (Phase 5)
+New `/wealth` page replaces "Categories" in bottom nav (Categories still accessible via Settings quick links).
+
+### DB Tables Added (version 4)
+- `assetAccounts` — accounts ledger: salary, savings, MF, gold, PPF, crypto; groups: liquid/growth/emergency
+- `assetSnapshots` — historical balance snapshots with delta; written on every "Update Balance"
+- `fdRecords` — FD metadata: principal, openDate, maturityDate, interestRate, compoundingFrequency
+- `creditCards` — card metadata: name, limit, statementDay, dueDay, color, lastSettledAt
+
+### Transaction Schema Change
+- `paymentMethod` field added (non-indexed): null = cash, or creditCard.uuid
+- AddTransactionSheet shows Payment Method selector (card pills) when ≥1 credit card exists; hidden for income
+
+### 5 Tabs
+1. **Assets** — AssetAllocationRing (donut: liquid/growth/emergency), account cards with Update Balance + edit
+2. **FDs** — MaturityTimeline (stacked horizontal BarChart: principal + projected interest), FD cards with progress bar
+3. **Emergency** — SVG semicircle gauge (runway months vs target), target editable inline, avg monthly essentials from last 3 months of needs/fixed transactions
+4. **Cards** — Upcoming bills sorted by due date, credit card cards with available credit + "Settle" flow
+5. **Net Worth** — Hero card (Net Worth = Assets − CC Outstanding), full breakdown, Net Liquidity = (Liquid + Emergency) − CC Outstanding
+
+### Settlement Flow
+"Settle" on a card opens SettlementSheet: selects source liquid/emergency account, deducts outstanding from account balance, writes assetSnapshot, updates card.lastSettledAt. No duplicate transaction created (spending already logged at point-of-purchase).
 
 ## Key Decisions
 - API key stored in localStorage (user-entered at runtime), never hardcoded
@@ -25,42 +50,35 @@ Fully built privacy-first PWA for personal expense tracking. All 4 phases from t
 - Budget percentages user-configurable per month (not fixed 50/30/20)
 - Hash router so PWA works without a server
 - Gemini called only on explicit "AI Tag" button click (privacy + cost control)
-- Gemini model: gemini-1.5-flash
+- FD calculations 100% client-side (compound interest formula)
+- Emergency target in localStorage (not per-month DB config)
+- CC outstanding = all transactions tagged to card since lastSettledAt (not billing-cycle based)
 
-## File Structure
+## File Structure (additions)
 ```
 src/
-  context/AppContext.jsx       global state
-  db/db.js                     Dexie schema + seeds
-  services/gemini.js           AI service
-  utils/formatters.js          INR formatting, month utils
-  utils/sanitizer.js           number-stripping for AI privacy
-  components/
-    layout/AppShell.jsx        header + month nav
-    layout/BottomNav.jsx       5-item bottom nav + FAB
-    ui/BottomSheet.jsx         slide-up sheet
-    ui/Modal.jsx               center modal
-    dashboard/SummaryCards.jsx income/expense header card
-    dashboard/PillarBars.jsx   budget progress bars
-    dashboard/SpendingDonut.jsx  recharts PieChart donut
-    dashboard/FixedVsVariable.jsx recharts BarChart
-    transactions/AddTransactionSheet.jsx  add/edit form with AI
-    transactions/TransactionItem.jsx      list item with edit/delete
-  pages/
-    Dashboard.jsx   summary + charts + recent 5 txns
-    Transactions.jsx list with search + pillar/type filters
-    History.jsx     3/6/12 month area + stacked bar + summary table
-    Categories.jsx  CRUD for subcategories
-    Settings.jsx    income, budget%, API key, export/import, clear
+  services/fdCalculator.js         compound interest engine
+  pages/Wealth.jsx                 main wealth page (data + 5 tabs inline)
+  components/wealth/
+    AssetAllocationRing.jsx        Recharts donut chart
+    SnapshotUpdateSheet.jsx        balance update bottom sheet
+    AssetAccountFormSheet.jsx      add/edit account
+    FDFormSheet.jsx                add/edit FD
+    MaturityTimeline.jsx           horizontal stacked bar chart
+    EmergencyFundGauge.jsx         SVG semicircle gauge
+    CreditCardFormSheet.jsx        add/edit credit card
+    SettlementSheet.jsx            card bill settlement flow
+    NetWorthPanel.jsx              net worth + liquidity summary
 ```
 
 ## Open Items
-- No recurring transaction support yet
-- No OCR receipt scanner (Phase 5 future item from master plan)
+- FD maturity "unlock" event: no push notification when an FD matures (future)
+- Credit card billing-period model is simplified (since lastSettledAt, not statement cycle)
+- No OCR receipt scanner (Phase 5 future item)
 - Chart library (recharts) is 421KB; lazy-load if startup perf matters
 
 ## Next Steps
 - Run `npm run dev` and open http://localhost:5173
 - Go to Settings → add Gemini API key, set monthly income + budget %
-- Add first transaction with "AI Tag" to validate the full flow
+- Go to Wealth → add salary/savings accounts, set up FDs, add credit cards
 - `npm run build` → deploy `dist/` to any static host (Vercel, Netlify, Cloudflare Pages)

@@ -8,7 +8,7 @@ export function formatCurrency(amount) {
   return INR.format(amount)
 }
 
-export function formatDate(timestamp) {
+function formatDate(timestamp) {
   return new Date(timestamp).toLocaleDateString('en-IN', {
     day: 'numeric',
     month: 'short',
